@@ -485,18 +485,20 @@ static void maybe_create_new_hsm(void)
 	int max_wait_sec = 30;
 
 	int fd = -1;
-	const char* serialport1 = "/dev/ttyACM0";
-	const char* serialport2 = "/dev/cu.usbmodem1442";
+	char device_paths[][25] = {
+		"/dev/cu.usbmodem14311",
+		"/dev/cu.usbmodem1442",
+		"/dev/ttyACM0"
+	};
+
 	while (fd < 0 && waited_sec < max_wait_sec) {
-		fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
-		if(fd >= 0) {
-			break;
+		for (size_t i = 0; i < sizeof(device_paths) / sizeof(device_paths[0]); i++) {
+			fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);
+			if(fd >= 0) {
+				break;
+			}
+			printf("Failed to open serialport %s.. have waited for %d sec so far..\n", device_paths[i], waited_sec);
 		}
-		fd = open(serialport2, O_RDWR | O_NOCTTY | O_NDELAY);
-		if(fd >= 0) {
-			break;
-		}
-		printf("FIXMEH: failed to open serialport, waited for %d sec so far\n", waited_sec);
 		wait_for(1);
 		waited_sec++;
 	}

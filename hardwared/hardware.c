@@ -8,5 +8,5 @@ int main(int argc, char* argv[])
         serial_write("ping");
         sleep(1);
     } while(serial_read());
-    //Start lightningd
+    //Start lightningd here:
 }

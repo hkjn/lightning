@@ -21,7 +21,7 @@ void serial_write(char * msg){
     if(fd == -1)                        /* Error Checking */
     {
         printf("Write Serial Bus Error");
-        return;
+        //return;
     }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
@@ -70,7 +70,7 @@ int serial_read(){
     if(fd == -1)                        /* Error Checking */
     {
         printf("Read Serial Bus Error!");
-        return 0;
+        //return 0;
     }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
@@ -98,7 +98,7 @@ int serial_read(){
 
     /*------------------------------- Read data to serial port -----------------------------*/
 
-    char buf [100]; /*Store the buffer in here */
+    char buf [50]; /*Store the buffer in here */
 
     int bytes_read = read(fd,buf,sizeof buf);/* use write() to send data to port                                            */
                                      /* "fd"                   - file descriptor pointing to the opened serial port */

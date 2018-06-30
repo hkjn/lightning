@@ -24,7 +24,11 @@ int get_hardware_wallet_fd(void)
 		"/dev/cu.usbmodem14311",
 		"/dev/cu.usbmodem1442",
 		"/dev/ttyACM0",
-		"/dev/ttyACM1"
+		"/dev/ttyACM1",
+		"/dev/ttyACM2",
+		"/dev/ttyACM3",
+		"/dev/ttyACM4",
+		"/dev/ttyACM5"
 	};
 	for (size_t i = 0; i < sizeof(device_paths) / sizeof(device_paths[0]); i++) {
 		fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);

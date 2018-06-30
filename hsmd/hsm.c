@@ -493,7 +493,7 @@ static void maybe_create_new_hsm(void)
 	}
 	if (fd < 0) {
 		printf("Failed to find any hardware device in %d sec\n", max_wait_sec);
-		status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR, "filed to find hardware device in maybe_create_new_hsm");
 	}
 
 	struct termios SerialPortSettings;  /* Create the structure                          */
@@ -519,7 +519,7 @@ static void maybe_create_new_hsm(void)
 	int bytes_written = write(fd, request_msg, 30);
 	if (bytes_written < 0) {
 		printf("failed to write get_hsm_secret message to serial port\n");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR, "failed to write get_hsm_secret to serial port in maybe_create_new_hsm");
 	}
 	printf("FIXMEH: wrote %d bytes to fd: %s\n", bytes_written, request_msg);
 
@@ -543,33 +543,20 @@ static void maybe_create_new_hsm(void)
 	// TODO: parse JSON here, we expect a message like the following to be in 'buf':
 	// { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
 	// TODO: we need to extract the "payload" key of the response and put it inside secretstuff, similar to:
-	//  randombytes_buf(&secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret));
+	char *payload = "aaaaaf1234abcdef1234abcdefffffff";
+	memcpy(&secretstuff.hsm_secret, payload, sizeof(secretstuff.hsm_secret));
 	close(fd);
-	status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
-}
-
-static void load_hsm(void)
-{
-	int fd = open("hsm_secret", O_RDONLY);
-	if (fd < 0)
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "opening: %s", strerror(errno));
-	if (!read_all(fd, &secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret)))
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "reading: %s", strerror(errno));
-	close(fd);
-
-	populate_secretstuff();
 }
 
 static void init_hsm(struct daemon_conn *master, const u8 *msg)
 {
-
 	if (!fromwire_hsm_init(msg))
 		master_badmsg(WIRE_HSM_INIT, msg);
 
 	maybe_create_new_hsm();
-	load_hsm();
+	// Note: we no longer need to read the hsm_secret (it doesn't exist on the client anymore), but
+	// we do still derive BIP32 keys etc in populate_secretstuff() below.
+	populate_secretstuff();
 
 	send_init_response(master);
 }

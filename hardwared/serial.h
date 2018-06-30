@@ -1,3 +1,6 @@
+#ifndef SERIAL_H
+#define SERIAL_H
+
 /*
  * This program sends the string from command line argument argv[1] to the serial port
  * If there are no arguments - sends "Nothing"
@@ -14,8 +17,8 @@
 
 // write here the serial port you have Arduino plugged to
 // should be autodetected afterwards
-const char* serialport = "/dev/ttyACM0";
 
 void serial_write(char * msg);
 int serial_read();
 
+#endif /*SERIAL_H*/

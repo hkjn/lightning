@@ -82,6 +82,7 @@ void PRINTF_FMT(4, 5) command_fail_detailed(struct command *cmd,
 /* Mainly for documentation, that we plan to close this later. */
 void command_still_pending(struct command *cmd);
 
+char * device_present(void);
 
 /* For initialization */
 void setup_jsonrpc(struct lightningd *ld, const char *rpc_filename);

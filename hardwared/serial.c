@@ -22,8 +22,8 @@ void serial_write(char * msg){
 
     if(fd == -1)                        /* Error Checking */
     {
-        printf("Write Serial Bus Error");
-        //return;
+        printf("Write Serial Bus Error\n");
+        return;
     }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
@@ -71,8 +71,8 @@ int serial_read(){
 
     if(fd == -1)                        /* Error Checking */
     {
-        printf("Read Serial Bus Error!");
-        //return 0;
+        printf("Read Serial Bus Error!\n");
+        return 1;
     }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
@@ -102,7 +102,7 @@ int serial_read(){
 
     char buf[128]; /*Store the buffer in here */
     int waited_sec = 0;
-    int max_wait_sec = 30;
+    int max_wait_sec = 10;
     int bytes_read = 0;
     int offset = 0;
 

@@ -8,8 +8,6 @@
 #define COMMANDER_NUM_SIG_MIN       14// Must be >= desktop app's `MAX_INPUTS_PER_SIGN` !!
 #define COMMANDER_SIG_LEN           154// sig + recid + json formatting
 #define COMMANDER_ARRAY_MAX         (COMMANDER_REPORT_SIZE - (COMMANDER_SIG_LEN * 8))// Multiple is emperically found such that NUM_SIG_MIN is maximum
-#define COMMANDER_ARRAY_ELEMENT_MAX 1024
-#define ERR_IO_REPORT_BUF 107
 
 static int REPORT_BUF_OVERFLOW = 0;
 __extension__ static char json_array[] = {[0 ... COMMANDER_ARRAY_MAX] = 0};
@@ -64,14 +62,14 @@ int main(int argc, char* argv[])
 {
     //Wait for the hardware to be plugged in
     do {
-        serial_write("ping");
-        sleep(1);
+       commander_fill_report("ping");
+       serial_write(json_report);
+       sleep(2);
     } while(serial_read());
-    commander_fill_report("My hovercraft is full of eels");
+    commander_fill_report("get_hsm_secret");
     serial_write(json_report);
     serial_read();
-    serial_read();
-    const char* response = commander_parse("{\"status\":\"success\",\"payload\":\"My hovercraft is full of eels\"}");
+    const char* response = commander_parse(json_report);
     printf(response);
     //Start lightningd here:
 }

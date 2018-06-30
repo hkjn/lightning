@@ -8,11 +8,13 @@
 #include "serial.h"
 
 // Arduimo is hardwired to /dev/ttyACM0
+static const char serialport1[]= "/dev/ttyACM0";
+
 
 void serial_write(char * msg){
     int fd;/*File Descriptor*/
 
-    fd = open(serialport, O_RDWR | O_NOCTTY | O_NDELAY);
+    fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
                             /* O_RDWR Read/Write access to serial port           */
                             /* O_NOCTTY - No terminal will control the process   */
                             /* O_NDELAY -Non Blocking Mode,Does not care about-  */
@@ -61,7 +63,7 @@ void serial_write(char * msg){
 int serial_read(){
     int fd;/*File Descriptor*/
 
-    fd = open(serialport, O_RDWR | O_NOCTTY | O_NDELAY);
+    fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
                             /* O_RDWR Read/Write access to serial port           */
                             /* O_NOCTTY - No terminal will control the process   */
                             /* O_NDELAY -Non Blocking Mode,Does not care about-  */

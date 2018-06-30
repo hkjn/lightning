@@ -460,6 +460,8 @@ static void bitcoin_keypair(struct privkey *privkey,
 			      "BIP32 pubkey %u create failed", index);
 }
 
+// TODO: instead of reading hsm_secret from disk, we should block here until the serial device appears
+// when the device file appears, we try to fetch hsm_secret from hardware wallet, which should block here until user has agreeed to pairing
 static void maybe_create_new_hsm(void)
 {
 	int fd = open("hsm_secret", O_CREAT|O_EXCL|O_WRONLY, 0400);

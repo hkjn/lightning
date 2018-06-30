@@ -7,7 +7,7 @@
 
 #include "serial.h"
 
-// Arduimo is hardwired to /dev/cu.usbmodem1461
+// Arduimo is hardwired to /dev/ttyACM0
 
 void serial_write(char * msg){
     int fd;/*File Descriptor*/

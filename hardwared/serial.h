@@ -14,7 +14,7 @@
 
 // write here the serial port you have Arduino plugged to
 // should be autodetected afterwards
-static char serialport[] = "/dev/cu.usbmodem1461";
+const char* serialport = "/dev/ttyACM0";
 
 void serial_write(char * msg);
 int serial_read();

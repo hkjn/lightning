@@ -143,9 +143,10 @@ static const struct json_command dev_crash_command = {
 AUTODATA(json_command, &dev_crash_command);
 #endif /* DEVELOPER */
 
-char * device_present()
+char * hw_present(void)
 {
   int fd = -1;
+  // TODO: would be nice to refactor out common.c utility function for this..
   char device_paths[][25] = {
     "/dev/cu.usbmodem14311",
     "/dev/cu.usbmodem1442",
@@ -155,11 +156,11 @@ char * device_present()
   for (size_t i = 0; i < sizeof(device_paths) / sizeof(device_paths[0]); i++) {
     fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);
     if(fd >= 0) {
-      return "true";
+      return "connected";
     }
   }
 
-  return "false";
+  return "disconnected";
 }
 
 
@@ -192,7 +193,7 @@ static void json_getinfo(struct command *cmd,
 	json_add_string(response, "version", version());
 	json_add_num(response, "blockheight", get_block_height(cmd->ld->topology));
 	json_add_string(response, "network", get_chainparams(cmd->ld)->network_name);
-	json_add_string(response, "device_present", device_present());
+	json_add_string(response, "hardwarewallet", hw_present());
 	json_object_end(response);
 	command_success(cmd, response);
 }

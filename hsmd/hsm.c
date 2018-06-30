@@ -25,6 +25,7 @@
 #include <common/utils.h>
 #include <common/version.h>
 #include <common/withdraw_tx.h>
+
 #include <errno.h>
 #include <fcntl.h>
 #include <hsmd/capabilities.h>
@@ -474,18 +475,11 @@ static void maybe_create_new_hsm(void)
 	int waited_sec = 0;
 	int max_wait_sec = 30;
 	int fd = -1;
-	char device_paths[][25] = {
-		"/dev/cu.usbmodem14311",
-		"/dev/cu.usbmodem1442",
-		"/dev/ttyACM0"
-	};
 
 	while (fd < 0 && waited_sec < max_wait_sec) {
-		for (size_t i = 0; i < sizeof(device_paths) / sizeof(device_paths[0]); i++) {
-			fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);
-			if(fd >= 0) {
-				break;
-			}
+		fd = get_hardware_wallet_fd();
+		if(fd >= 0) {
+			break;
 		}
 		printf("Failed to find any hardware device.. have waited for %d sec so far..\n", waited_sec);
 		wait_for(1);

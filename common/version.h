@@ -10,4 +10,5 @@ const char *version(void);
 	opt_register_early_noarg("--version|-V", version_and_exit, NULL, \
 				 "Print version and exit")
 
+int get_hardware_wallet_fd(void);
 #endif /* LIGHTNING_COMMON_VERSION_H */

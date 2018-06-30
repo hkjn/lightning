@@ -19,7 +19,10 @@ void serial_write(char * msg){
                             /* -the status of DCD line,Open() returns immediatly */
 
     if(fd == -1)                        /* Error Checking */
+    {
+        printf("Write Serial Bus Error");
         return;
+    }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
 
@@ -65,7 +68,10 @@ int serial_read(){
                             /* -the status of DCD line,Open() returns immediatly */
 
     if(fd == -1)                        /* Error Checking */
-        return;
+    {
+        printf("Read Serial Bus Error!");
+        return 0;
+    }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
 

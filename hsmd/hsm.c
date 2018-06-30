@@ -33,9 +33,13 @@
 #include <inttypes.h>
 #include <secp256k1_ecdh.h>
 #include <sodium/randombytes.h>
+#include <stdio.h>
+#include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <termios.h>
+#include <time.h>
 #include <unistd.h>
 #include <wally_bip32.h>
 #include <wire/gen_peer_wire.h>
@@ -87,6 +91,17 @@ static void node_key(struct privkey *node_privkey, struct pubkey *node_id)
 	} while (!secp256k1_ec_pubkey_create(secp256k1_ctx, &node_id->pubkey,
 					     node_privkey->secret.data));
 }
+
+static void wait_for(unsigned int secs) {
+	unsigned int ret_time = time(0) + secs;
+	while (time(0) < ret_time);
+}
+
+// TODO: we want a function that tries to:
+// open a fd to serial port device (or the call failed)
+// read a valid JSON-message ending with \n
+//   like { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
+// if no valid message is received in TIMEOUT (30s?), the call failed
 
 static struct client *new_client(struct daemon_conn *master,
 				 const struct pubkey *id,
@@ -460,47 +475,87 @@ static void bitcoin_keypair(struct privkey *privkey,
 			      "BIP32 pubkey %u create failed", index);
 }
 
-// TODO: instead of reading hsm_secret from disk, we should block here until the serial device appears
-// when the device file appears, we try to fetch hsm_secret from hardware wallet, which should block here until user has agreeed to pairing
-// if user declines to pair, we can and should crash at this point
 static void maybe_create_new_hsm(void)
 {
-	int fd = open("hsm_secret", O_CREAT|O_EXCL|O_WRONLY, 0400);
+	printf("FIXMEH: in maybe_create_new_hsm()\n");
+	// TODO: we need to retrieve hsm_secret bytes over
+	// serial port from hardware wallet, which should block here until user has agreed to pairing. Similar to:
+	//  randombytes_buf(&secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret));
+	int waited_sec = 0;
+	int max_wait_sec = 30;
+
+	int fd = -1;
+	const char* serialport = "/dev/ttyACM0";
+	while (fd < 0 && waited_sec < max_wait_sec) {
+		fd = open(serialport, O_RDWR | O_NOCTTY | O_NDELAY);
+		if(fd >= 0) {
+			break;
+		}
+		printf("FIXMEH: failed to open serialport %s, waited for %d sec so far\n", serialport, waited_sec);
+		wait_for(1);
+		waited_sec++;
+	}
 	if (fd < 0) {
-		if (errno == EEXIST)
-			return;
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "creating: %s", strerror(errno));
+		printf("FIXMEH: failed to find device in %d sec\n", max_wait_sec);
+		status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
 	}
 
-	randombytes_buf(&secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret));
-	if (!write_all(fd, &secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret))) {
-		unlink_noerr("hsm_secret");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "writing: %s", strerror(errno));
+	struct termios SerialPortSettings;  /* Create the structure                          */
+	tcgetattr(fd, &SerialPortSettings); /* Get the current attributes of the Serial port */
+	cfsetispeed(&SerialPortSettings,B9600); /* Set Read  Speed as 9600                       */
+	cfsetospeed(&SerialPortSettings,B9600); /* Set Write Speed as 9600                       */
+
+	SerialPortSettings.c_cflag &= ~PARENB;   /* Disables the Parity Enable bit(PARENB),So No Parity   */
+	SerialPortSettings.c_cflag &= ~CSTOPB;   /* CSTOPB = 2 Stop bits,here it is cleared so 1 Stop bit */
+	SerialPortSettings.c_cflag &= ~CSIZE;    /* Clears the mask for setting the data size             */
+	SerialPortSettings.c_cflag |=  CS8;      /* Set the data bits = 8                                 */
+
+	SerialPortSettings.c_cflag &= ~CRTSCTS;       /* No Hardware flow Control                         */
+	SerialPortSettings.c_cflag |= CREAD | CLOCAL; /* Enable receiver,Ignore Modem Control lines       */
+
+	SerialPortSettings.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable XON/XOFF flow control both i/p and o/p */
+	// non canonical mode
+	SerialPortSettings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);
+	// no output processing
+	SerialPortSettings.c_oflag &= ~OPOST;
+
+	// 32 bytes
+	printf("FIXMEH: size of hsm_secret struct: %ld\n", sizeof(secretstuff.hsm_secret));
+
+	// we want to read in a loop with minimal sleep, until we have a message ending with \n, or timeout
+	int offset = 0;
+	char buf[128];
+	printf("FIXMEH: buf is %ld long\n", sizeof buf);
+	while (waited_sec < max_wait_sec && offset < sizeof buf - 1) {
+		int bytes_read = read(fd, buf+offset, 1);
+		if (bytes_read > 0) { // TODO: how can buf[offset] be -32?
+			// printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, buf, buf[offset]);
+			if (buf[offset] == '\n') {
+				break; // end of message
+			}
+			offset++;
+			continue;
+		}
+		wait_for(1);
+		waited_sec++;
 	}
-	if (fsync(fd) != 0) {
-		unlink_noerr("hsm_secret");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "fsync: %s", strerror(errno));
-	}
-	if (close(fd) != 0) {
-		unlink_noerr("hsm_secret");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "closing: %s", strerror(errno));
-	}
-	fd = open(".", O_RDONLY);
-	if (fd < 0) {
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "opening: %s", strerror(errno));
-	}
-	if (fsync(fd) != 0) {
-		unlink_noerr("hsm_secret");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR,
-			      "fsyncdir: %s", strerror(errno));
-	}
+	printf("FIXMEH: we now have read a message of %d chars in %d sec: %s\n", offset, waited_sec, buf);
+
 	close(fd);
-	status_unusual("HSM: created new hsm_secret file");
+	/*
+	 * int bytes_read = read(fd, buf, sizeof buf);
+	printf("FIXMEH: read %d bytes from serialport\n", bytes_read);
+
+	if (bytes_read > 0) {
+		printf("Read %d: \"%s\"\n", bytes_read, buf);
+		const char needle[1] = "\n";
+		char *ret;
+
+		ret = strstr(buf, needle);
+		printf("The substring is: %s\n", ret);
+		return;
+	}*/
+	status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
 }
 
 static void load_hsm(void)
@@ -847,4 +902,6 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+
 #endif

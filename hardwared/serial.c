@@ -100,12 +100,26 @@ int serial_read(){
 
     /*------------------------------- Read data to serial port -----------------------------*/
 
-    char buf [50]; /*Store the buffer in here */
+    char buf[128]; /*Store the buffer in here */
+    int waited_sec = 0;
+    int max_wait_sec = 30;
+    int bytes_read = 0;
+    int offset = 0;
 
-    int bytes_read = read(fd,buf,sizeof buf);/* use write() to send data to port                                            */
-                                     /* "fd"                   - file descriptor pointing to the opened serial port */
-                                     /* "write_buffer"         - address of the buffer containing data              */
-                                     /* "sizeof(write_buffer)" - No of bytes to write                               */
+	while (waited_sec < max_wait_sec && offset < sizeof(buf) - 1) {
+		bytes_read = read(fd, buf+offset, 1);
+		if (bytes_read > 0) { // how can buf[offset] be -32 here??
+			// printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, buf, buf[offset]);
+			if (buf[offset] == '\n') {
+				break; // end of message
+			}
+			offset++;
+			continue;
+		}
+		sleep(1);
+		waited_sec++;
+    }
+
     close(fd);/* Close the Serial port */
     if (bytes_read > 0)
     {

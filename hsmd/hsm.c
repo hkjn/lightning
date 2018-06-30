@@ -505,6 +505,9 @@ static void maybe_create_new_hsm(void)
 		status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
 	}
 
+	// TODO: write this to fd here:
+	// {"request":"get_hsm_secret"}
+
 	struct termios SerialPortSettings;  /* Create the structure                          */
 	tcgetattr(fd, &SerialPortSettings); /* Get the current attributes of the Serial port */
 	cfsetispeed(&SerialPortSettings,B9600); /* Set Read  Speed as 9600                       */
@@ -545,21 +548,9 @@ static void maybe_create_new_hsm(void)
 		waited_sec++;
 	}
 	printf("FIXMEH: we now have read a message of %d chars in %d sec: %s\n", offset, waited_sec, buf);
-
+	// TODO: parse JSON here, we expect a message like the following to be in 'buf':
+	// { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
 	close(fd);
-	/*
-	 * int bytes_read = read(fd, buf, sizeof buf);
-	printf("FIXMEH: read %d bytes from serialport\n", bytes_read);
-
-	if (bytes_read > 0) {
-		printf("Read %d: \"%s\"\n", bytes_read, buf);
-		const char needle[1] = "\n";
-		char *ret;
-
-		ret = strstr(buf, needle);
-		printf("The substring is: %s\n", ret);
-		return;
-	}*/
 	status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
 }
 

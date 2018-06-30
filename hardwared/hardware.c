@@ -2,7 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "yajl/src/api/yajl_tree.h"
-#include "flags.h"
+//#include "flags.h"
 
 #define COMMANDER_REPORT_SIZE       3584
 #define COMMANDER_NUM_SIG_MIN       14// Must be >= desktop app's `MAX_INPUTS_PER_SIGN` !!
@@ -31,7 +31,7 @@ void commander_fill_report(const char *request)
 {
     char *p = json_report;
     snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
-            "{\"request\":\"%s\"}", request);
+            "{\"request\":\"%s\"}\n", request);
 }
 
 const char *commander_parse(const char *command)
@@ -55,7 +55,7 @@ const char *commander_parse(const char *command)
     const char *cPayload = YAJL_GET_STRING(yajl_tree_get(json_node, payload, yajl_t_string));
     if (strcmp(cStatus,success))
     {
-        fprintf(stderr, "failure received from HSM %s != %s",success,cStatus);
+        fprintf(stderr, "Failure received from HSM %s", cPayload);
     }
     return cPayload;
 }
@@ -68,6 +68,9 @@ int main(int argc, char* argv[])
         sleep(1);
     } while(serial_read());
     commander_fill_report("My hovercraft is full of eels");
+    serial_write(json_report);
+    serial_read();
+    serial_read();
     const char* response = commander_parse("{\"status\":\"success\",\"payload\":\"My hovercraft is full of eels\"}");
     printf(response);
     //Start lightningd here:

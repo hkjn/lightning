@@ -515,7 +515,7 @@ static void maybe_create_new_hsm(void)
 	// no output processing
 	SerialPortSettings.c_oflag &= ~OPOST;
 
-	const char *request_msg = "{\"request\":\"get_hsm_secret\"}";
+	const char *request_msg = "{\"request\":\"get_hsm_secret\"}\n";
 	int bytes_written = write(fd, request_msg, 30);
 	if (bytes_written < 0) {
 		printf("failed to write get_hsm_secret message to serial port\n");

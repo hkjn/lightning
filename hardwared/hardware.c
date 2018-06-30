@@ -1,4 +1,5 @@
 #include "serial.h"
+#include <string.h>
 #include <unistd.h>
 #include "yajl/src/api/yajl_tree.h"
 #include "flags.h"
@@ -26,44 +27,38 @@ const char *commander_read_report(void)
 }
 
 
-void commander_fill_report(const char *cmd, const char *msg, int flag)
+void commander_fill_report(const char *request)
 {
     char *p = json_report;
-
-    if (!strlens(json_report)) {
-        strncat(json_report, "{", 1);
-    } else {
-        json_report[strlens(json_report) - 1] = ','; // replace closing '}' with continuing ','
-    }
-
-    if (strlens(msg)) {
-        snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
-                 "\"%s\":{\"message\":\"%s\",\"code\":%s,\"command\":\"%s\"}",
-                 attr_str(ATTR_error), msg, flag_code(flag), cmd);
-    } else {
-        snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
-                 "\"%s\":{\"message\":\"%s\",\"code\":%s,\"command\":\"%s\"}",
-                 attr_str(ATTR_error), flag_msg(flag), flag_code(flag), cmd);
-    }
-    //else if (flag == DBB_JSON_BOOL || flag == DBB_JSON_ARRAY || flag == DBB_JSON_NUMBER) {
-    //    snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
-    //             "\"%s\":%s", cmd, msg);
-    //} else {
-    //    snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
-    //             "\"%s\":\"%s\"", cmd, msg);
-    //}
-
-    if ((strlens(json_report) + 1) >= COMMANDER_REPORT_SIZE) {
-        commander_clear_report();
-        snprintf(json_report, COMMANDER_REPORT_SIZE,
-                 "{\"%s\":{\"message\":\"%s\",\"code\":%s,\"command\":\"%s\"}}", attr_str(ATTR_error),
-                 flag_msg(ERR_IO_REPORT_BUF), flag_code(ERR_IO_REPORT_BUF), cmd);
-        REPORT_BUF_OVERFLOW = 1;
-    } else {
-        strcat(json_report, "}");
-    }
+    snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
+            "{\"request\":\"%s\"}", request);
 }
 
+const char *commander_parse(const char *command)
+{
+    yajl_val value, json_node;
+    const char *success = "success";
+    char errbuf[1024];
+    json_node = yajl_tree_parse((const char*) command, errbuf, sizeof(errbuf));
+    //for (int cmd = 0; cmd < CMD_NUM; cmd++) {
+    if (json_node == NULL)
+	{
+		fprintf(stderr, "parse_error: ");
+        if (strlen(errbuf)) fprintf(stderr, " %s", errbuf);
+        else fprintf(stderr, "unknown error");
+        fprintf(stderr, "\n");
+        return 1;
+    }
+    const char *status[] = { "status", (const char *) 0 };
+    const char *payload[] = { "payload", (const char *) 0 };
+    const char *cStatus = YAJL_GET_STRING(yajl_tree_get(json_node, status, yajl_t_string));
+    const char *cPayload = YAJL_GET_STRING(yajl_tree_get(json_node, payload, yajl_t_string));
+    if (strcmp(cStatus,success))
+    {
+        fprintf(stderr, "failure received from HSM %s != %s",success,cStatus);
+    }
+    return cPayload;
+}
 
 int main(int argc, char* argv[])
 {
@@ -72,7 +67,8 @@ int main(int argc, char* argv[])
         serial_write("ping");
         sleep(1);
     } while(serial_read());
-    commander_fill_report("send","My hovercraft is full of eels",1);
-    printf(json_report);
+    commander_fill_report("My hovercraft is full of eels");
+    const char* response = commander_parse("{\"status\":\"success\",\"payload\":\"My hovercraft is full of eels\"}");
+    printf(response);
     //Start lightningd here:
 }

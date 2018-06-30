@@ -1,0 +1,44 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/drgrid/lightning/hardwared/yajl/perf/documents.c
+documents.h
+/home/drgrid/lightning/hardwared/yajl/perf/documents.h
+stdlib.h
+-
+string.h
+-
+
+/home/drgrid/lightning/hardwared/yajl/perf/documents.h
+
+/home/drgrid/lightning/hardwared/yajl/perf/perftest.c
+yajl/yajl_parse.h
+-
+stdio.h
+-
+stdlib.h
+-
+string.h
+-
+documents.h
+/home/drgrid/lightning/hardwared/yajl/perf/documents.h
+sys/time.h
+-
+windows.h
+-
+
+perf/../yajl-2.1.1/include/yajl/yajl_common.h
+stddef.h
+-
+
+perf/../yajl-2.1.1/include/yajl/yajl_parse.h
+yajl_common.h
+perf/../yajl-2.1.1/include/yajl/yajl_common.h
+stddef.h
+-
+

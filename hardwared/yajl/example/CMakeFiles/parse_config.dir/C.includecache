@@ -1,0 +1,24 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/drgrid/lightning/hardwared/yajl/example/parse_config.c
+stdio.h
+-
+string.h
+-
+yajl/yajl_tree.h
+/home/drgrid/lightning/hardwared/yajl/example/yajl/yajl_tree.h
+
+example/../yajl-2.1.1/include/yajl/yajl_common.h
+stddef.h
+-
+
+example/../yajl-2.1.1/include/yajl/yajl_tree.h
+yajl_common.h
+example/../yajl-2.1.1/include/yajl/yajl_common.h
+

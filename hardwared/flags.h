@@ -108,6 +108,7 @@ X(ataes)          \
 X(touchbutton)    \
 X(warning)        \
 X(NUM)             /* keep last */
+X(
 
 
 // Attributes

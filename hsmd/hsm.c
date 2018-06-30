@@ -97,12 +97,6 @@ static void wait_for(unsigned int secs) {
 	while (time(0) < ret_time);
 }
 
-// TODO: we want a function that tries to:
-// open a fd to serial port device (or the call failed)
-// read a valid JSON-message ending with \n
-//   like { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
-// if no valid message is received in TIMEOUT (30s?), the call failed
-
 static struct client *new_client(struct daemon_conn *master,
 				 const struct pubkey *id,
 				 const u64 capabilities,
@@ -477,13 +471,8 @@ static void bitcoin_keypair(struct privkey *privkey,
 
 static void maybe_create_new_hsm(void)
 {
-	printf("FIXMEH: in maybe_create_new_hsm()\n");
-	// TODO: we need to retrieve hsm_secret bytes over
-	// serial port from hardware wallet, which should block here until user has agreed to pairing. Similar to:
-	//  randombytes_buf(&secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret));
 	int waited_sec = 0;
 	int max_wait_sec = 30;
-
 	int fd = -1;
 	char device_paths[][25] = {
 		"/dev/cu.usbmodem14311",
@@ -497,18 +486,15 @@ static void maybe_create_new_hsm(void)
 			if(fd >= 0) {
 				break;
 			}
-			printf("Failed to open serialport %s.. have waited for %d sec so far..\n", device_paths[i], waited_sec);
 		}
+		printf("Failed to find any hardware device.. have waited for %d sec so far..\n", waited_sec);
 		wait_for(1);
 		waited_sec++;
 	}
 	if (fd < 0) {
-		printf("FIXMEH: failed to find device in %d sec\n", max_wait_sec);
+		printf("Failed to find any hardware device in %d sec\n", max_wait_sec);
 		status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
 	}
-
-	// TODO: write this to fd here:
-	// {"request":"get_hsm_secret"}
 
 	struct termios SerialPortSettings;  /* Create the structure                          */
 	tcgetattr(fd, &SerialPortSettings); /* Get the current attributes of the Serial port */
@@ -529,16 +515,20 @@ static void maybe_create_new_hsm(void)
 	// no output processing
 	SerialPortSettings.c_oflag &= ~OPOST;
 
-	// 32 bytes
-	printf("FIXMEH: size of hsm_secret struct: %ld\n", sizeof(secretstuff.hsm_secret));
+	const char *request_msg = "{\"request\":\"get_hsm_secret\"}";
+	int bytes_written = write(fd, request_msg, 30);
+	if (bytes_written < 0) {
+		printf("failed to write get_hsm_secret message to serial port\n");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
+	}
+	printf("FIXMEH: wrote %d bytes to fd: %s\n", bytes_written, request_msg);
 
-	// we want to read in a loop with minimal sleep, until we have a message ending with \n, or timeout
 	int offset = 0;
 	char buf[128];
-	printf("FIXMEH: buf is %ld long\n", sizeof buf);
-	while (waited_sec < max_wait_sec && offset < sizeof buf - 1) {
+	// Read until timeout or until we've seen too much text but no terminating newline.
+	while (waited_sec < max_wait_sec && offset < sizeof(buf) - 1) {
 		int bytes_read = read(fd, buf+offset, 1);
-		if (bytes_read > 0) { // TODO: how can buf[offset] be -32?
+		if (bytes_read > 0) { // how can buf[offset] be -32 here??
 			// printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, buf, buf[offset]);
 			if (buf[offset] == '\n') {
 				break; // end of message
@@ -552,6 +542,8 @@ static void maybe_create_new_hsm(void)
 	printf("FIXMEH: we now have read a message of %d chars in %d sec: %s\n", offset, waited_sec, buf);
 	// TODO: parse JSON here, we expect a message like the following to be in 'buf':
 	// { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
+	// TODO: we need to extract the "payload" key of the response and put it inside secretstuff, similar to:
+	//  randombytes_buf(&secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret));
 	close(fd);
 	status_failed(STATUS_FAIL_INTERNAL_ERROR, "crashing on purpose in maybe_create_new_hsm");
 }

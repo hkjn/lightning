@@ -164,21 +164,23 @@ WIRE_GEN := tools/generate-wire.py
 ALL_PROGRAMS =
 
 CPPFLAGS = -DBINTOPKGLIBEXECDIR='"'$(shell sh tools/rel.sh $(bindir) $(pkglibexecdir))'"'
-CWARNFLAGS := 
+CWARNFLAGS := -Wall -Wundef -Wmissing-prototypes -Wmissing-declarations -Wstrict-prototypes -Wold-style-definition
+# CWARNFLAGS := -Werror 
 CDEBUGFLAGS := -std=gnu11 -g -fstack-protector
-CFLAGS = $(CPPFLAGS) $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) $(EXTERNAL_INCLUDE_FLAGS) -I . -I/usr/local/include $(FEATURES) $(COVFLAGS) $(DEV_CFLAGS) -DSHACHAIN_BITS=48 -DJSMN_PARENT_LINKS $(PIE_CFLAGS) -fPIE -fPIC $(COMPAT_CFLAGS)
+CFLAGS = $(CPPFLAGS) $(CWARNFLAGS) $(CDEBUGFLAGS) -I $(CCANDIR) $(EXTERNAL_INCLUDE_FLAGS) -I . -I/usr/local/include $(FEATURES) $(COVFLAGS) $(DEV_CFLAGS) -DSHACHAIN_BITS=48 -DJSMN_PARENT_LINKS $(PIE_CFLAGS) $(COMPAT_CFLAGS)
 
 # We can get configurator to run a different compile cmd to cross-configure.
 CONFIGURATOR_CC := $(CC)
 
-LDFLAGS = $(PIE_LDFLAGS) -pie
-LDLIBS = -L/usr/local/lib -lm -lgmp -lsqlite3 -lz -L/hsmd -lyajl_s $(COVFLAGS)
+LDFLAGS = $(PIE_LDFLAGS)
+LDLIBS = -L/usr/local/lib -lm -lgmp -lsqlite3 -lz $(COVFLAGS)
 
 default: all-programs all-test-programs
 
 config.vars ccan/config.h: configure
 	@if [ ! -f config.vars ]; then echo 'The 1990s are calling: use ./configure!' >&2; exit 1; fi
 	./configure --reconfigure
+
 
 include external/Makefile
 include bitcoin/Makefile

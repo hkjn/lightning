@@ -131,3 +131,5 @@ add_var PYTEST "$PYTEST"
 # Hack to avoid sha256 name clash with libwally: will be fixed when that
 # becomes a standalone shared lib.
 echo '#include "ccan_compat.h"' >> $CONFIG_HEADER
+
+cp hsmd/yajl/build/yajl-2.1.1/lib/libyajl_s.a external/libyajl_s.a

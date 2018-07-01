@@ -13,9 +13,10 @@ LIBSECP_HEADERS := external/libwally-core/src/secp256k1/include/secp256k1_ecdh.h
 		external/libwally-core/src/secp256k1/include/secp256k1.h
 JSMN_HEADERS := external/jsmn/jsmn.h
 LIBBASE58_HEADERS := external/libbase58/libbase58.h
+LIBYAJL_HEADERS := external/yajl/include/yajl/yajl_tree.h external/yajl/include/yajl/yajl_common.h external/yajl/include/yajl/yajl_parse.h external/yajl/include/yajl/yajl_version.h external/yajl/include/yajl/yajl_gen.h
 
-EXTERNAL_HEADERS := $(LIBSODIUM_HEADERS) $(LIBWALLY_HEADERS) $(LIBSECP_HEADERS) $(JSMN_HEADERS) $(LIBBASE58_HEADERS)
-EXTERNAL_LIBS := external/libwallycore.a external/libsecp256k1.a external/libsodium.a external/libjsmn.a external/libbase58.a external/libbacktrace.a
+EXTERNAL_HEADERS := $(LIBSODIUM_HEADERS) $(LIBWALLY_HEADERS) $(LIBSECP_HEADERS) $(JSMN_HEADERS) $(LIBBASE58_HEADERS) $(LIBYAJL_HEADERS)
+EXTERNAL_LIBS := external/libwallycore.a external/libsecp256k1.a external/libsodium.a external/libjsmn.a external/libbase58.a external/libbacktrace.a external/libyajl_s.a
 
 EXTERNAL_INCLUDE_FLAGS :=					\
 	-I external/libsodium/src/libsodium/include		\
@@ -24,7 +25,8 @@ EXTERNAL_INCLUDE_FLAGS :=					\
 	-I external/jsmn/					\
 	-I external/libbase58/					\
 	-I external/libbacktrace/				\
-	-I external/libbacktrace-build
+	-I external/libbacktrace-build \
+	-I external/yajl/include/yajl
 
 EXTERNAL_LDLIBS := -Lexternal $(patsubst lib%.a,-l%,$(notdir $(EXTERNAL_LIBS)))
 

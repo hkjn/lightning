@@ -44,7 +44,8 @@
 #include <wally_bip32.h>
 #include <wire/gen_peer_wire.h>
 #include <wire/wire_io.h>
-#include "yajl/src/api/yajl_tree.h"
+//#include "yajl/build/yajl-2.1.1/include/yajl/yajl_tree.h"
+#include <yajl_tree.h>
 #include "serial.h"
 
 /* Nobody will ever find it here! */

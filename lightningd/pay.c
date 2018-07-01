@@ -18,6 +18,12 @@
 #include <sodium/randombytes.h>
 #include <stdio.h>
 
+static void sprintHex(const u8 * arr, size_t len, char * buf, size_t buflen){
+	for(int i=0; i<len; i++){
+		buf += sprintf(buf, "%02x", arr[i]);
+	}
+}
+
 static void request(char * msg, char * response, size_t response_size){
 	char command[200] = {0};
 	// FIXMEH: path below shouldn't be hardcoded.
@@ -703,7 +709,8 @@ send_payment(const tal_t *ctx,
 	payment = wallet_payment_by_hash(tmpctx, ld->wallet, rhash);
 
 	char cmd[1000] = {0};
-	snprintf(cmd, sizeof(cmd), "Pay %lu satoshi?", msatoshi/1000);
+    snprintf(cmd, sizeof(cmd), "Pay %llu satoshi?    Hash: ", msatoshi/1000);
+	sprintHex(rhash->u.u8, sizeof(rhash->u.u8), cmd+strlen(cmd), sizeof(cmd)-strlen(cmd));
 	if(!simple_request(cmd)){
 		char *msg = tal_fmt(tmpctx,
 				    "Cancel by user");

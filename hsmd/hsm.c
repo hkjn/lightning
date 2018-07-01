@@ -61,6 +61,13 @@ struct client {
 	u64 capabilities;
 };
 
+static void sprintHex(const u8 * arr, size_t len, char * buf, size_t buflen){
+	for(int i=0; i<len; i++){
+		buf += sprintf(buf, "%02x", arr[i]);
+	}
+}
+
+
 static void request(char * msg, char * response, size_t response_size){
 	char command[200] = {0};
 	char path[] = "~/.lightning/rw";
@@ -664,7 +671,8 @@ static void sign_funding_tx(struct daemon_conn *master, const u8 *msg)
 
 	/* **************************************************************** */
 	char cmd[1000] = {0};
-	snprintf(cmd, sizeof(cmd), "Open channel with %lu satoshi?", satoshi_out);
+    snprintf(cmd, sizeof(cmd), "Open channel with %llu satoshi? Pubkey: ", satoshi_out);
+	sprintHex(remote_pubkey.pubkey.data, 32, cmd+strlen(cmd), sizeof(cmd)-strlen(cmd));    
 	if(!simple_request(cmd)){
 		status_broken("User cancelled: %s",
 			      tal_hex(tmpctx, msg));

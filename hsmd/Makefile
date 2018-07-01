@@ -12,9 +12,11 @@ LIGHTNINGD_HSM_CLIENT_SRC := hsmd/client.c hsmd/gen_hsm_client_wire.c
 LIGHTNINGD_HSM_CLIENT_OBJS := $(LIGHTNINGD_HSM_CLIENT_SRC:.c=.o)
 
 # lightningd/hsm needs these:
-LIGHTNINGD_HSM_HEADERS := hsmd/gen_hsm_client_wire.h
+LIGHTNINGD_HSM_HEADERS := hsmd/gen_hsm_client_wire.h hsmd/serial.h 
 
-LIGHTNINGD_HSM_SRC := hsmd/hsm.c	\
+#yajl/yajl-2.1.1/include/yajl/yajl_common.h yajl/yajl-2.1.1/include/yajl/yajl_parse.h yajl/yajl-2.1.1/include/yajl/yajl_tree.h 
+
+LIGHTNINGD_HSM_SRC := hsmd/serial.c hsmd/hsm.c	\
 	$(LIGHTNINGD_HSM_HEADERS:.h=.c)
 LIGHTNINGD_HSM_OBJS := $(LIGHTNINGD_HSM_SRC:.c=.o)
 

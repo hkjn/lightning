@@ -44,6 +44,8 @@
 #include <wally_bip32.h>
 #include <wire/gen_peer_wire.h>
 #include <wire/wire_io.h>
+#include "yajl/src/api/yajl_tree.h"
+#include "serial.h"
 
 /* Nobody will ever find it here! */
 static struct {
@@ -61,6 +63,33 @@ struct client {
 	/* What is this client allowed to ask for? */
 	u64 capabilities;
 };
+
+char *commander_parse(char *buf)
+{
+    yajl_val json_node;
+    const char *success = "success";
+    char errbuf[1024];
+    json_node = yajl_tree_parse(buf, errbuf, sizeof(errbuf));
+    //for (int cmd = 0; cmd < CMD_NUM; cmd++) {
+    if (json_node == NULL)
+	{
+		fprintf(stderr, "parse_error: ");
+        if (strlen(errbuf)) fprintf(stderr, " %s", errbuf);
+        else fprintf(stderr, "unknown error");
+        fprintf(stderr, "\n");
+        return "failed to parse payload";
+    }
+    const char *status[] = { "status", (const char *) 0 };
+    const char *payload[] = { "payload", (const char *) 0 };
+    const char *cStatus = YAJL_GET_STRING(yajl_tree_get(json_node, status, yajl_t_string));
+    const char *cPayload = YAJL_GET_STRING(yajl_tree_get(json_node, payload, yajl_t_string));
+    if (strcmp(cStatus,success))
+    {
+        fprintf(stderr, "Failure received from HSM %s", cPayload);
+    }
+    return cPayload;
+}
+
 
 /* Function declarations for later */
 static void init_hsm(struct daemon_conn *master, const u8 *msg);
@@ -480,70 +509,21 @@ static void maybe_create_new_hsm(void)
 		"/dev/ttyACM0"
 	};
 
-	while (fd < 0 && waited_sec < max_wait_sec) {
-		for (size_t i = 0; i < sizeof(device_paths) / sizeof(device_paths[0]); i++) {
-			fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);
-			if(fd >= 0) {
-				break;
-			}
-		}
-		printf("Failed to find any hardware device.. have waited for %d sec so far..\n", waited_sec);
-		wait_for(1);
-		waited_sec++;
-	}
-	if (fd < 0) {
-		printf("Failed to find any hardware device in %d sec\n", max_wait_sec);
-		status_failed(STATUS_FAIL_INTERNAL_ERROR, "filed to find hardware device in maybe_create_new_hsm");
-	}
+    char buf[1024] = {[0 ... 1023] = 0};
+    size_t length = strlen(buf);
+    //Wait for the hardware to be plugged in
+    do {
+        sleep(1);
+        serial_write("{\"request\":\"ping\"}");
+    } while(serial_read(buf, length));
 
-	struct termios SerialPortSettings;  /* Create the structure                          */
-	tcgetattr(fd, &SerialPortSettings); /* Get the current attributes of the Serial port */
-	cfsetispeed(&SerialPortSettings,B9600); /* Set Read  Speed as 9600                       */
-	cfsetospeed(&SerialPortSettings,B9600); /* Set Write Speed as 9600                       */
-
-	SerialPortSettings.c_cflag &= ~PARENB;   /* Disables the Parity Enable bit(PARENB),So No Parity   */
-	SerialPortSettings.c_cflag &= ~CSTOPB;   /* CSTOPB = 2 Stop bits,here it is cleared so 1 Stop bit */
-	SerialPortSettings.c_cflag &= ~CSIZE;    /* Clears the mask for setting the data size             */
-	SerialPortSettings.c_cflag |=  CS8;      /* Set the data bits = 8                                 */
-
-	SerialPortSettings.c_cflag &= ~CRTSCTS;       /* No Hardware flow Control                         */
-	SerialPortSettings.c_cflag |= CREAD | CLOCAL; /* Enable receiver,Ignore Modem Control lines       */
-
-	SerialPortSettings.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable XON/XOFF flow control both i/p and o/p */
-	// non canonical mode
-	SerialPortSettings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-	// no output processing
-	SerialPortSettings.c_oflag &= ~OPOST;
-
-	const char *request_msg = "{\"request\":\"get_hsm_secret\"}\n";
-	int bytes_written = write(fd, request_msg, 30);
-	if (bytes_written < 0) {
-		printf("failed to write get_hsm_secret message to serial port\n");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR, "failed to write get_hsm_secret to serial port in maybe_create_new_hsm");
-	}
-	printf("FIXMEH: wrote %d bytes to fd: %s\n", bytes_written, request_msg);
-
-	int offset = 0;
-	char buf[128];
-	// Read until timeout or until we've seen too much text but no terminating newline.
-	while (waited_sec < max_wait_sec && offset < sizeof(buf) - 1) {
-		int bytes_read = read(fd, buf+offset, 1);
-		if (bytes_read > 0) { // how can buf[offset] be -32 here??
-			// printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, buf, buf[offset]);
-			if (buf[offset] == '\n') {
-				break; // end of message
-			}
-			offset++;
-			continue;
-		}
-		wait_for(1);
-		waited_sec++;
-	}
-	printf("FIXMEH: we now have read a message of %d chars in %d sec: %s\n", offset, waited_sec, buf);
-	// TODO: parse JSON here, we expect a message like the following to be in 'buf':
-	// { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
-	// TODO: we need to extract the "payload" key of the response and put it inside secretstuff, similar to:
-	char *payload = "aaaaaf1234abcdef1234abcdefffffff";
+    serial_write("{\"request\":\"get_hsm_secret\"}");
+    sleep(1);
+    memset(buf, 0, 1024);
+    serial_read(buf, length);
+    char *payload = commander_parse(buf);
+    printf("Received payload:%s",payload);
+    //Start lightningd here:
 	memcpy(&secretstuff.hsm_secret, payload, sizeof(secretstuff.hsm_secret));
 	close(fd);
 }

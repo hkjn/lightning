@@ -504,13 +504,7 @@ static void maybe_create_new_hsm(void)
 	int waited_sec = 0;
 	int max_wait_sec = 30;
 	int fd = -1;
-	char device_paths[][25] = {
-		"/dev/cu.usbmodem14311",
-		"/dev/cu.usbmodem1442",
-		"/dev/ttyACM0"
-	};
-
-    char buf[1024] = {[0 ... 1023] = 0};
+	char buf[1024] = {[0 ... 1023] = 0};
     size_t length = strlen(buf);
     //Wait for the hardware to be plugged in
     do {

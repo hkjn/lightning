@@ -8,22 +8,59 @@
 #include "serial.h"
 
 // Arduimo is hardwired to /dev/ttyACM0
-static const char serialport1[]= "/dev/ttyACM0";
+static char serialport1[100] = {[0 ... 99] = 0};
+static char nullchar[100] = {[0 ... 99] = 0};
 
+char device_paths[][25] = {
+		"/dev/cu.usbmodem14311",
+		"/dev/cu.usbmodem1442",
+		"/dev/ttyACM0",
+        "/dev/ttyACM1"
+	};
 
 void serial_write(char * msg){
     int fd;/*File Descriptor*/
 
-    fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
-                            /* O_RDWR Read/Write access to serial port           */
-                            /* O_NOCTTY - No terminal will control the process   */
-                            /* O_NDELAY -Non Blocking Mode,Does not care about-  */
-                            /* -the status of DCD line,Open() returns immediatly */
+    //Scan for ports, make sure the device is there:
 
-    if(fd == -1)                        /* Error Checking */
+    printf("Try to compare\n");
+    if (0 == strcmp(serialport1,nullchar))
     {
-        printf("Write Serial Bus Error\n");
-        return;
+        for (int i=0; i<4; i++)
+        {
+            fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);
+                                    /* O_RDWR Read/Write access to serial port           */
+                                    /* O_NOCTTY - No terminal will control the process   */
+                                    /* O_NDELAY -Non Blocking Mode,Does not care about-  */
+                                    /* -the status of DCD line,Open() returns immediatly */
+
+            if(fd == -1)                        /* Error Checking */
+            {
+                printf("Scan: Device not found at%s",device_paths[i]);
+            }
+            else
+            {
+                strcpy(serialport1, device_paths[i]);
+                printf("\nDevice found at%s\n",serialport1);
+                break;
+            }
+            if (i==3)
+            {
+                printf("Scan: Device not connected, or unrelated serial error.\n");
+                close(fd);
+                return;
+            }
+        }
+    }
+    else
+    {
+        fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
+        if(fd == -1)
+        {
+            printf("Skipped Scan, Error while opening serial device file. %s\n", serialport1);
+            close(fd);
+            return;
+        }
     }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */
@@ -64,16 +101,45 @@ int serial_read(char *result, size_t length){
     int fd;/*File Descriptor*/
     printf("serial_read %s\n", result);
 
-    fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
-                            /* O_RDWR Read/Write access to serial port           */
-                            /* O_NOCTTY - No terminal will control the process   */
-                            /* O_NDELAY -Non Blocking Mode,Does not care about-  */
-                            /* -the status of DCD line,Open() returns immediatly */
+    //scan for ports make sure the device is there
 
-    if(fd == -1)                        /* Error Checking */
+    if (0 == strcmp(serialport1,nullchar))
     {
-        printf("Read Serial Bus Error!\n");
-        return 1;
+        for (int i=0; i<sizeof(device_paths)/sizeof(device_paths[0]); i++)
+        {
+            fd = open(device_paths[i], O_RDWR | O_NOCTTY | O_NDELAY);
+                                    /* O_RDWR Read/Write access to serial port           */
+                                    /* O_NOCTTY - No terminal will control the process   */
+                                    /* O_NDELAY -Non Blocking Mode,Does not care about-  */
+                                    /* -the status of DCD line,Open() returns immediatly */
+
+            if(fd == -1)                        /* Error Checking */
+            {
+                printf("Device not found at%s",device_paths[i]);
+            }
+            else
+            {
+                strcpy(serialport1, device_paths[i]);
+                printf("\nDevice found at%s\n",serialport1);
+                break;
+            }
+            if (i==3)
+            {
+                printf("Device not connected, or unrelated serial error.\n");
+                close(fd);
+                return 1;
+            }
+        }
+    }
+    else
+    {
+        fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
+        if(fd == -1)
+        {
+            printf("Error while opening serial device file. %s\n", serialport1);
+            close(fd);
+            return 1;
+        }
     }
 
     /*---------- Setting the Attributes of the serial port using termios structure --------- */

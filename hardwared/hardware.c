@@ -10,34 +10,13 @@
 #define COMMANDER_ARRAY_MAX         (COMMANDER_REPORT_SIZE - (COMMANDER_SIG_LEN * 8))// Multiple is emperically found such that NUM_SIG_MIN is maximum
 
 static int REPORT_BUF_OVERFLOW = 0;
-__extension__ static char json_array[] = {[0 ... COMMANDER_ARRAY_MAX] = 0};
-__extension__ static char json_report[] = {[0 ... COMMANDER_REPORT_SIZE] = 0};
 
-void commander_clear_report(void)
-{
-    memset(json_report, 0, COMMANDER_REPORT_SIZE);
-    REPORT_BUF_OVERFLOW = 0;
-}
-
-const char *commander_read_report(void)
-{
-    return json_report;
-}
-
-
-void commander_fill_report(const char *request)
-{
-    char *p = json_report;
-    snprintf(p + strlens(json_report), COMMANDER_REPORT_SIZE - strlens(json_report),
-            "{\"request\":\"%s\"}\n", request);
-}
-
-const char *commander_parse(const char *command)
+const char *commander_parse(char *buf)
 {
     yajl_val value, json_node;
     const char *success = "success";
     char errbuf[1024];
-    json_node = yajl_tree_parse((const char*) command, errbuf, sizeof(errbuf));
+    json_node = yajl_tree_parse(buf, errbuf, sizeof(errbuf));
     //for (int cmd = 0; cmd < CMD_NUM; cmd++) {
     if (json_node == NULL)
 	{
@@ -45,7 +24,7 @@ const char *commander_parse(const char *command)
         if (strlen(errbuf)) fprintf(stderr, " %s", errbuf);
         else fprintf(stderr, "unknown error");
         fprintf(stderr, "\n");
-        return 1;
+        return "failed to parse payload";
     }
     const char *status[] = { "status", (const char *) 0 };
     const char *payload[] = { "payload", (const char *) 0 };
@@ -60,16 +39,19 @@ const char *commander_parse(const char *command)
 
 int main(int argc, char* argv[])
 {
+    char buf[1024] = {[0 ... 1023] = 0};
+    size_t length = strlen(buf);
     //Wait for the hardware to be plugged in
     do {
-       commander_fill_report("ping");
-       serial_write(json_report);
-       sleep(2);
-    } while(serial_read());
-    commander_fill_report("get_hsm_secret");
-    serial_write(json_report);
-    serial_read();
-    const char* response = commander_parse(json_report);
+        sleep(1);
+        serial_write("{\"request\":\"ping\"}");
+    } while(serial_read(buf, length));
+
+    serial_write("{\"request\":\"get_hsm_secret\"}");
+    sleep(1);
+    memset(buf, 0, 1024);
+    serial_read(buf);
+    const char* response = commander_parse(buf);
     printf(response);
     //Start lightningd here:
 }

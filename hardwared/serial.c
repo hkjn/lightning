@@ -60,8 +60,9 @@ void serial_write(char * msg){
     close(fd);/* Close the Serial port */
 }
 
-int serial_read(){
+int serial_read(char *result, size_t length){
     int fd;/*File Descriptor*/
+    printf("serial_read %s\n", result);
 
     fd = open(serialport1, O_RDWR | O_NOCTTY | O_NDELAY);
                             /* O_RDWR Read/Write access to serial port           */
@@ -100,17 +101,17 @@ int serial_read(){
 
     /*------------------------------- Read data to serial port -----------------------------*/
 
-    char buf[128]; /*Store the buffer in here */
+    //char buf[250]; /*Store the buffer in here */
     int waited_sec = 0;
     int max_wait_sec = 10;
     int bytes_read = 0;
     int offset = 0;
 
-	while (waited_sec < max_wait_sec && offset < sizeof(buf) - 1) {
-		bytes_read = read(fd, buf+offset, 1);
+	while (waited_sec < max_wait_sec && offset < length - 1) {
+		bytes_read = read(fd, result+offset, 1);
 		if (bytes_read > 0) { // how can buf[offset] be -32 here??
-			// printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, buf, buf[offset]);
-			if (buf[offset] == '\n') {
+			//printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, result, result[offset]);
+			if (result[offset] == '\n') {
 				break; // end of message
 			}
 			offset++;
@@ -123,7 +124,7 @@ int serial_read(){
     close(fd);/* Close the Serial port */
     if (bytes_read > 0)
     {
-        printf("Read %d: \"%s\"\n", bytes_read, buf);
+        printf("Read %d: \"%s\"\n", bytes_read, result);
         return 0;
     }
     return 1;

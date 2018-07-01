@@ -16,6 +16,31 @@
 #include <lightningd/peer_htlcs.h>
 #include <lightningd/subd.h>
 #include <sodium/randombytes.h>
+#include <stdio.h>
+
+static void request(char * msg, char * response, size_t response_size){
+	char command[200] = {0};
+	// FIXMEH: path below shouldn't be hardcoded.
+	char path[] = "/Users/ss/Documents/Bitcoin/lntests/rw";
+	snprintf(command, sizeof(command), "%s \"%s\"", path, msg);
+	FILE* fd = popen(command, "r");
+    if (fd == NULL){
+        return;
+    }
+    fgets(response, response_size, fd);
+    pclose(fd);
+}
+
+static int simple_request(char * msg){
+    char buf[1000] = {0};
+    request(msg, buf, sizeof(buf));
+    if(memcmp(buf, "success", strlen("success"))==0){
+    	return 1;
+    }
+    else{
+    	return 0;
+    }
+}
 
 /*-----------------------------------------------------------------------------
 Internal sendpay interface
@@ -651,6 +676,7 @@ send_payment(const tal_t *ctx,
 	struct channel *channel;
 	struct sendpay_result *result;
 
+
 	/* Expiry for HTLCs is absolute.  And add one to give some margin. */
 	base_expiry = get_block_height(ld->topology) + 1;
 
@@ -675,6 +701,20 @@ send_payment(const tal_t *ctx,
 
 	/* Now, do we already have a payment? */
 	payment = wallet_payment_by_hash(tmpctx, ld->wallet, rhash);
+
+	char cmd[1000] = {0};
+	snprintf(cmd, sizeof(cmd), "Pay %lu satoshi?", msatoshi/1000);
+	if(!simple_request(cmd)){
+		char *msg = tal_fmt(tmpctx,
+				    "Cancel by user");
+		log_debug(ld->log, "send_payment: cancel by user");
+		result = sendpay_result_simple_fail(tmpctx,
+						    PAY_RHASH_ALREADY_USED,
+						    msg);
+		cb(result, cbarg);
+		return false;
+	}
+
 	if (payment) {
 		/* FIXME: We should really do something smarter here! */
 		log_debug(ld->log, "send_payment: found previous");

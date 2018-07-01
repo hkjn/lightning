@@ -25,7 +25,6 @@
 #include <common/utils.h>
 #include <common/version.h>
 #include <common/withdraw_tx.h>
-
 #include <errno.h>
 #include <fcntl.h>
 #include <hsmd/capabilities.h>
@@ -34,17 +33,16 @@
 #include <inttypes.h>
 #include <secp256k1_ecdh.h>
 #include <sodium/randombytes.h>
-#include <stdio.h>
-#include <string.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <termios.h>
-#include <time.h>
 #include <unistd.h>
 #include <wally_bip32.h>
 #include <wire/gen_peer_wire.h>
 #include <wire/wire_io.h>
+#include <stdio.h>
+
+#define USE_MAYBE 0
 
 /* Nobody will ever find it here! */
 static struct {
@@ -62,6 +60,29 @@ struct client {
 	/* What is this client allowed to ask for? */
 	u64 capabilities;
 };
+
+static void request(char * msg, char * response, size_t response_size){
+	char command[200] = {0};
+	char path[] = "~/.lightning/rw";
+	snprintf(command, sizeof(command), "%s \"%s\"", path, msg);
+	FILE* fd = popen(command, "r");
+    if (fd == NULL){
+        return;
+    }
+    fgets(response, response_size, fd);
+    pclose(fd);
+}
+
+static int simple_request(char * msg){
+    char buf[1000] = {0};
+    request(msg, buf, sizeof(buf));
+    if(memcmp(buf, "success", strlen("success"))==0){
+    	return 1;
+    }
+    else{
+    	return 0;
+    }
+}
 
 /* Function declarations for later */
 static void init_hsm(struct daemon_conn *master, const u8 *msg);
@@ -91,11 +112,6 @@ static void node_key(struct privkey *node_privkey, struct pubkey *node_id)
 		salt++;
 	} while (!secp256k1_ec_pubkey_create(secp256k1_ctx, &node_id->pubkey,
 					     node_privkey->secret.data));
-}
-
-static void wait_for(unsigned int secs) {
-	unsigned int ret_time = time(0) + secs;
-	while (time(0) < ret_time);
 }
 
 static struct client *new_client(struct daemon_conn *master,
@@ -472,89 +488,73 @@ static void bitcoin_keypair(struct privkey *privkey,
 
 static void maybe_create_new_hsm(void)
 {
-	int waited_sec = 0;
-	int max_wait_sec = 30;
-	int fd = -1;
-
-	while (fd < 0 && waited_sec < max_wait_sec) {
-		fd = get_hardware_wallet_fd();
-		if(fd >= 0) {
-			break;
+	if(USE_MAYBE){
+		if(!simple_request("Plz let us start")){
+			status_failed(STATUS_FAIL_INTERNAL_ERROR,
+				      "maybe_create_new_hsm: hardware did not confirm");
 		}
-		printf("Failed to find any hardware device.. have waited for %d sec so far..\n", waited_sec);
-		wait_for(1);
-		waited_sec++;
 	}
+
+	int fd = open("hsm_secret", O_CREAT|O_EXCL|O_WRONLY, 0400);
 	if (fd < 0) {
-		printf("Failed to find any hardware device in %d sec\n", max_wait_sec);
-		status_failed(STATUS_FAIL_INTERNAL_ERROR, "filed to find hardware device in maybe_create_new_hsm");
+		if (errno == EEXIST)
+			return;
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "creating: %s", strerror(errno));
 	}
 
-	struct termios SerialPortSettings;  /* Create the structure                          */
-	tcgetattr(fd, &SerialPortSettings); /* Get the current attributes of the Serial port */
-	cfsetispeed(&SerialPortSettings,B9600); /* Set Read  Speed as 9600                       */
-	cfsetospeed(&SerialPortSettings,B9600); /* Set Write Speed as 9600                       */
-
-	SerialPortSettings.c_cflag &= ~PARENB;   /* Disables the Parity Enable bit(PARENB),So No Parity   */
-	SerialPortSettings.c_cflag &= ~CSTOPB;   /* CSTOPB = 2 Stop bits,here it is cleared so 1 Stop bit */
-	SerialPortSettings.c_cflag &= ~CSIZE;    /* Clears the mask for setting the data size             */
-	SerialPortSettings.c_cflag |=  CS8;      /* Set the data bits = 8                                 */
-
-	SerialPortSettings.c_cflag &= ~CRTSCTS;       /* No Hardware flow Control                         */
-	SerialPortSettings.c_cflag |= CREAD | CLOCAL; /* Enable receiver,Ignore Modem Control lines       */
-
-	SerialPortSettings.c_iflag &= ~(IXON | IXOFF | IXANY);          /* Disable XON/XOFF flow control both i/p and o/p */
-	// non canonical mode
-	SerialPortSettings.c_iflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-	// no output processing
-	SerialPortSettings.c_oflag &= ~OPOST;
-
-	const char *request_msg = "{\"request\":\"get_hsm_secret\"}\n";
-	int bytes_written = write(fd, request_msg, 30);
-	if (bytes_written < 0) {
-		printf("failed to write get_hsm_secret message to serial port\n");
-		status_failed(STATUS_FAIL_INTERNAL_ERROR, "failed to write get_hsm_secret to serial port in maybe_create_new_hsm");
+	randombytes_buf(&secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret));
+	if (!write_all(fd, &secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret))) {
+		unlink_noerr("hsm_secret");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "writing: %s", strerror(errno));
 	}
-	printf("FIXMEH: wrote %d bytes to fd: %s\n", bytes_written, request_msg);
-
-	int offset = 0;
-	char buf[128];
-	// Read until timeout or until we've seen too much text but no terminating newline.
-	while (waited_sec < max_wait_sec && offset < sizeof(buf) - 1) {
-		int bytes_read = read(fd, buf+offset, 1);
-		if (bytes_read > 0) { // how can buf[offset] be -32 here??
-			// printf("FIXMEH: read %d chars, offset is now %d: %s (last char %d)\n", bytes_read, offset, buf, buf[offset]);
-			if (buf[offset] == '\n') {
-				break; // end of message
-			}
-			offset++;
-			continue;
-		}
-		wait_for(1);
-		waited_sec++;
+	if (fsync(fd) != 0) {
+		unlink_noerr("hsm_secret");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "fsync: %s", strerror(errno));
 	}
-	printf("FIXMEH: we now have read a message of %d chars in %d sec: %s\n", offset, waited_sec, buf);
-	// TODO: parse JSON here, we expect a message like the following to be in 'buf':
-	// {"status":"success","payload":"abcdef1234abcdef1234abcdef1234ff"}
-	// FIXME: At minimum, need to check that index [11, 18) == 'success'..
-	char payload[32];
-	int begin = 30;
-	int end = 31;
-	strncpy(payload, buf + begin, end - begin);
-	// char *payload = "aaaaaf1234abcdef1234abcdefffffff";
-	memcpy(&secretstuff.hsm_secret, payload, sizeof(secretstuff.hsm_secret));
+	if (close(fd) != 0) {
+		unlink_noerr("hsm_secret");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "closing: %s", strerror(errno));
+	}
+	fd = open(".", O_RDONLY);
+	if (fd < 0) {
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "opening: %s", strerror(errno));
+	}
+	if (fsync(fd) != 0) {
+		unlink_noerr("hsm_secret");
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "fsyncdir: %s", strerror(errno));
+	}
 	close(fd);
+	status_unusual("HSM: created new hsm_secret file");
+}
+
+static void load_hsm(void)
+{
+	int fd = open("hsm_secret", O_RDONLY);
+	if (fd < 0)
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "opening: %s", strerror(errno));
+	if (!read_all(fd, &secretstuff.hsm_secret, sizeof(secretstuff.hsm_secret)))
+		status_failed(STATUS_FAIL_INTERNAL_ERROR,
+			      "reading: %s", strerror(errno));
+	close(fd);
+
+	populate_secretstuff();
 }
 
 static void init_hsm(struct daemon_conn *master, const u8 *msg)
 {
+
 	if (!fromwire_hsm_init(msg))
 		master_badmsg(WIRE_HSM_INIT, msg);
 
 	maybe_create_new_hsm();
-	// Note: we no longer need to read the hsm_secret (it doesn't exist on the client anymore), but
-	// we do still derive BIP32 keys etc in populate_secretstuff() below.
-	populate_secretstuff();
+	load_hsm();
 
 	send_init_response(master);
 }
@@ -662,6 +662,16 @@ static void sign_funding_tx(struct daemon_conn *master, const u8 *msg)
 			change_out, changekey,
 			NULL);
 
+	/* **************************************************************** */
+	char cmd[1000] = {0};
+	snprintf(cmd, sizeof(cmd), "Open channel with %lu satoshi?", satoshi_out);
+	if(!simple_request(cmd)){
+		status_broken("User cancelled: %s",
+			      tal_hex(tmpctx, msg));
+		master_badmsg(WIRE_HSM_SIGN_FUNDING, msg);
+	}
+	/* **************************************************************** */
+
 	scriptSigs = tal_arr(tmpctx, u8*, tal_count(utxomap));
 	for (i = 0; i < tal_count(utxomap); i++) {
 		struct pubkey inkey;
@@ -702,6 +712,14 @@ static void sign_funding_tx(struct daemon_conn *master, const u8 *msg)
  */
 static void sign_withdrawal_tx(struct daemon_conn *master, const u8 *msg)
 {
+	/* **************************************************************** */
+	if(!simple_request("Sign withdrawal tx?")){
+		status_broken("User cancelled: %s",
+			      tal_hex(tmpctx, msg));
+		master_badmsg(WIRE_HSM_SIGN_FUNDING, msg);
+	}
+	/* **************************************************************** */
+
 	u64 satoshi_out, change_out;
 	u32 change_keyindex;
 	struct utxo **utxos;
@@ -783,7 +801,7 @@ static void sign_invoice(struct daemon_conn *master, const u8 *msg)
 	if (!fromwire_hsm_sign_invoice(tmpctx, msg, &u5bytes, &hrpu8)) {
 		status_broken("Failed to parse sign_invoice: %s",
 			      tal_hex(tmpctx, msg));
-		return;
+		// return;
 	}
 
 	/* FIXME: Check invoice! */
@@ -877,6 +895,4 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
-
-
 #endif

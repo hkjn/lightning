@@ -535,9 +535,13 @@ static void maybe_create_new_hsm(void)
 	}
 	printf("FIXMEH: we now have read a message of %d chars in %d sec: %s\n", offset, waited_sec, buf);
 	// TODO: parse JSON here, we expect a message like the following to be in 'buf':
-	// { "status": "success",  "payload": "abcdef1234abcdef1234abcdef1234ff"  }
-	// TODO: we need to extract the "payload" key of the response and put it inside secretstuff, similar to:
-	char *payload = "aaaaaf1234abcdef1234abcdefffffff";
+	// {"status":"success","payload":"abcdef1234abcdef1234abcdef1234ff"}
+	// FIXME: At minimum, need to check that index [11, 18) == 'success'..
+	char payload[32];
+	int begin = 30;
+	int end = 31;
+	strncpy(payload, buf + begin, end - begin);
+	// char *payload = "aaaaaf1234abcdef1234abcdefffffff";
 	memcpy(&secretstuff.hsm_secret, payload, sizeof(secretstuff.hsm_secret));
 	close(fd);
 }
